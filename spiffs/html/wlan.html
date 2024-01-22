@@ -1,0 +1,59 @@
+<div class="d-flex flex-column w-100 h-100 justify-content-center align-items-center">
+
+    <div class="input-group mb-3 w-75">
+        <label class="input-group-text p-1 w-25" for="selectSsid">SSID</label>
+        <select class="form-select" id="selectSsid">
+          <option selected>Auswählen...</option>
+        </select>
+    </div>
+
+    <div class="input-group input-group mb-3 w-75">
+        <span class="input-group-text p-1 w-25" id="password">Password</span>
+        <input type="text" class="form-control" aria-label="Sizing example input" aria-describedby="password">
+    </div>
+
+    <button type="button" id="connectWithSSID" class="btn btn-outline-danger">Verbinden</button>
+
+</div>
+<script>
+    async function getSsidList() {
+        let response, ssidList;
+        var select = document.getElementById("selectSsid");
+        
+        try {
+            response = await fetch("/getSsidList");
+            ssidList = await response.text()
+            ssidList = ssidList.split(',');
+            for (let index = 0; index < ssidList.length; index++) {
+                let option = document.createElement("option");
+                option.text = ssidList[index];
+                select.add(option, index);
+            }
+        } catch( err ) {
+            document.getElementById("product_name").textContent = "---";
+        }
+    }
+
+    async function sendNewSSID() {
+        let data = document.getElementById("selectSsid").value + "," + document.getElementById("password").value
+        let ssid = document.querySelector("#selectSsid")
+        try {
+            const response = await fetch("/newSSID", {
+                method: "POST", // or 'PUT'
+                body: data,
+            });
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    }
+
+
+    window.addEventListener("load", function () {
+        document.getElementById("connectWithSSID").addEventListener("click", function(e) {
+            e.preventDefault();
+            sendNewSSID();
+        });
+
+        getSsidList();
+    })
+</script>
