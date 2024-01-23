@@ -241,6 +241,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
                ESP_LOGE(TAG, "%s", failOpenFileForWrite);
          }
 
+         strcpy(ledMessage.mode, NORMAL);
          strcpy(ledMessage.led, LED_BLUE);
          strcpy(ledMessage.state, ON);
          xQueueSend(xLedStateQueue, (void *) &ledMessage, 500 / portTICK_PERIOD_MS);

@@ -18,6 +18,16 @@ QueueHandle_t xLedStateQueue;
 ledStateMessage message;
 ledStateMessage tempMessage;
 
+ledProfil redLedProfil;
+ledProfil greenLedProfil;
+ledProfil yellowLedProfil;
+ledProfil blueLedProfil;
+
+ledProfil tempRedLedProfil;
+ledProfil tempGreenLedProfil;
+ledProfil tempYellowLedProfil;
+ledProfil tempblueLedProfil;
+
 static void ledInit(void) {
     // Prepare and then apply the LEDC PWM timer configuration
     ledc_timer_config_t ledRedTimer = {
@@ -40,6 +50,9 @@ static void ledInit(void) {
         .hpoint         = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ledRedChannel));
+    strcpy(redLedProfil.state, OFF);
+    strcpy(redLedProfil.mode, NORMAL);
+
 
     // Prepare and then apply the LEDC PWM timer configuration
     ledc_timer_config_t ledGreenTimer = {
@@ -62,6 +75,9 @@ static void ledInit(void) {
         .hpoint         = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ledGreenChannel));
+    strcpy(greenLedProfil.state, OFF);
+    strcpy(greenLedProfil.mode, NORMAL);
+
 
     // Prepare and then apply the LEDC PWM timer configuration
     ledc_timer_config_t ledYellowTimer = {
@@ -84,6 +100,9 @@ static void ledInit(void) {
         .hpoint         = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ledYellowChannel));
+    strcpy(yellowLedProfil.state, OFF);
+    strcpy(yellowLedProfil.mode, NORMAL);
+
 
     // Prepare and then apply the LEDC PWM timer configuration
     ledc_timer_config_t ledBlueTimer = {
@@ -106,24 +125,50 @@ static void ledInit(void) {
         .hpoint         = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ledBlueChannel));
+    strcpy(blueLedProfil.state, OFF);
+    strcpy(blueLedProfil.mode, NORMAL);
 }
 
 static void saveSettings() {
-    // ESP_LOGI(TAG, "Save Settings tempMessage -> LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
-    // ESP_LOGI(TAG, "Save Settings message -> LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
+    ESP_LOGI(TAG, "Save Settings tempMessage -> LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
+    ESP_LOGI(TAG, "Save Settings message -> LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
     if (strcmp(tempMessage.mode, "test") != 0) {
         strcpy(message.led, tempMessage.led);
         strcpy(message.state, tempMessage.state);
         strcpy(message.mode, tempMessage.mode);
+
+        strcpy(redLedProfil.state, tempRedLedProfil.state);
+        strcpy(redLedProfil.mode, tempRedLedProfil.mode);
+
+        strcpy(greenLedProfil.state, tempGreenLedProfil.state);
+        strcpy(greenLedProfil.mode, tempGreenLedProfil.mode);
+
+        strcpy(yellowLedProfil.state, tempYellowLedProfil.state);
+        strcpy(yellowLedProfil.mode, tempYellowLedProfil.mode);
+
+        strcpy(blueLedProfil.state, tempblueLedProfil.state);
+        strcpy(blueLedProfil.mode, tempblueLedProfil.mode);
     }
 }
 
-static void loadSettings() {
-    // ESP_LOGI(TAG, "Load Settings message -> LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
-    // ESP_LOGI(TAG, "Load Settings tempMessage -> LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
+static void loadSettings() { 
+    ESP_LOGI(TAG, "Load Settings message -> LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
+    ESP_LOGI(TAG, "Load Settings tempMessage -> LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
     strcpy(tempMessage.led, message.led);
     strcpy(tempMessage.state, message.state);
     strcpy(tempMessage.mode, message.mode);
+
+    strcpy(tempRedLedProfil.state, redLedProfil.state);
+    strcpy(tempRedLedProfil.mode, redLedProfil.mode);
+
+    strcpy(tempGreenLedProfil.state, greenLedProfil.state);
+    strcpy(tempGreenLedProfil.mode, greenLedProfil.mode);
+
+    strcpy(tempYellowLedProfil.state, yellowLedProfil.state);
+    strcpy(tempYellowLedProfil.mode, yellowLedProfil.mode);
+
+    strcpy(tempblueLedProfil.state, blueLedProfil.state);
+    strcpy(tempblueLedProfil.mode, blueLedProfil.mode);
 }
 
 static void blink() {
@@ -143,7 +188,6 @@ static void blink() {
 void ledControlTask( void *pvParameters ) {
     ESP_LOGI(TAG, "Start LedControlTask");
     
-    strcpy(tempMessage.led, LED_BLUE);
     strcpy(tempMessage.state, BLINK);
     strcpy(tempMessage.mode, NORMAL);
     xLedStateQueue = xQueueCreate( 10, sizeof( ledStateMessage ) );
@@ -155,48 +199,94 @@ void ledControlTask( void *pvParameters ) {
         saveSettings();
 
         if(xQueueReceive( xLedStateQueue, (void *) &tempMessage, BLINK_FREQ / portTICK_PERIOD_MS ) == pdTRUE ) {
-            ESP_LOGI(TAG, "New tempMessage info. LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
+            ESP_LOGI(TAG, "New tempMessage info. LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
+
+            if (strcmp(tempMessage.led, LED_BLUE) == 0) {
+                strcpy(tempblueLedProfil.state, tempMessage.state);
+                strcpy(tempblueLedProfil.mode, tempMessage.mode);
+            } else if(strcmp(tempMessage.led, LED_GREEN) == 0) {
+                strcpy(tempGreenLedProfil.state, tempMessage.state);
+                strcpy(tempGreenLedProfil.mode, tempMessage.mode);
+            } else if(strcmp(tempMessage.led, LED_RED) == 0) {
+                strcpy(tempRedLedProfil.state, tempMessage.state);
+                strcpy(tempRedLedProfil.mode, tempMessage.mode);
+            } else if(strcmp(tempMessage.led, LED_YELLOW) == 0) {
+                strcpy(tempYellowLedProfil.state, tempMessage.state);
+                strcpy(tempYellowLedProfil.mode, tempMessage.mode);
+            }
         } else {
             // TODO: Code überarbeiten. Jede LED ihren Zustand einzeln speichern.
             if (strcmp(tempMessage.mode, "normal") == 0) {
-                if (strcmp(message.state, BLINK) == 0) {
+                if (strcmp(tempMessage.state, BLINK) == 0) {
                     blink();
                     vTaskDelay((BLINK_INTERVALL - BLINK_FREQ) / portTICK_PERIOD_MS);
                 } else {
-                    // ESP_LOGI(TAG, "Set LED %s %s", message.led, message.state);
-                    if (strcmp(message.led, LED_BLUE) == 0) {
-                        if (strcmp(message.state, ON) == 0){
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
-                        } else {
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
-                        }
-                    } else if (strcmp(message.led, LED_YELLOW) == 0) {
-                        if (strcmp(message.state, ON) == 0){
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW, LEDC_DUTY_ON));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW));
-                        } else {
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW, LEDC_DUTY_OFF));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW));
-                        }
-                    } else if (strcmp(message.led, LED_GREEN) == 0) {
-                        if (strcmp(message.state, ON) == 0){
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, LEDC_DUTY_ON));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
-                        } else {
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, LEDC_DUTY_OFF));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
-                        }
-                    } else if (strcmp(message.led, LED_RED) == 0) {
-                        if (strcmp(message.state, ON) == 0){
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, LEDC_DUTY_ON));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
-                        } else {
-                            ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, LEDC_DUTY_OFF));
-                            ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
-                        }
+                    if (strcmp(tempblueLedProfil.state, ON) == 0){
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    } else {
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
                     }
+
+                    if (strcmp(tempYellowLedProfil.state, ON) == 0){
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    } else {
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    }
+
+                    if (strcmp(tempGreenLedProfil.state, ON) == 0){
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    } else {
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    }
+
+                    if (strcmp(tempRedLedProfil.state, ON) == 0){
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    } else {
+                        ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
+                        ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    }
+
+                    // ESP_LOGI(TAG, "Set LED %s %s", message.led, message.state);
+                    // if (strcmp(message.led, LED_BLUE) == 0) {
+                    //     if (strcmp(message.state, ON) == 0){
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_ON));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    //     } else {
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, LEDC_DUTY_OFF));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+                    //     }
+                    // } else if (strcmp(message.led, LED_YELLOW) == 0) {
+                    //     if (strcmp(message.state, ON) == 0){
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW, LEDC_DUTY_ON));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW));
+                    //     } else {
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW, LEDC_DUTY_OFF));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_YELLOW));
+                    //     }
+                    // } else if (strcmp(message.led, LED_GREEN) == 0) {
+                    //     if (strcmp(message.state, ON) == 0){
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, LEDC_DUTY_ON));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
+                    //     } else {
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, LEDC_DUTY_OFF));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
+                    //     }
+                    // } else if (strcmp(message.led, LED_RED) == 0) {
+                    //     if (strcmp(message.state, ON) == 0){
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, LEDC_DUTY_ON));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
+                    //     } else {
+                    //         ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, LEDC_DUTY_OFF));
+                    //         ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
+                    //     }
+                    // }
                 }
             } else if (strcmp(tempMessage.mode, "test") == 0) {
 

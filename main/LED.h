@@ -47,6 +47,11 @@ typedef struct ledState_t {
    char mode[10];
 } ledStateMessage;
 
+typedef struct ledProfil_t {
+   char state[10]; // ON - OFF
+   char mode[10]; // TEST - NORMAL - BLINK
+} ledProfil;
+
 extern QueueHandle_t xLedStateQueue;
 
 void ledControlTask( void *pvParameters );
