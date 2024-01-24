@@ -379,12 +379,51 @@ static esp_err_t wlanHtmlHandler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t ledSingleTestHandler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Load %s", req->uri);
+
+    ledStateMessage message = {'\0'};
+    char buf[100] = {0x00};
+    int ret, remaining = req->content_len;
+    char delimiter[] = ",";
+    char *ptr;
+
+    httpd_req_recv( req, buf, sizeof(buf) - 1);
+    ptr = strtok(buf, delimiter);
+
+    while(ptr != NULL) {
+        ESP_LOGI(TAG, "Value: %s", ptr);
+        if (strlen(message.led) == 0) {
+            ESP_LOGI(TAG, "LED: %s", ptr);
+            strcpy(message.led, ptr);
+        } else if (strlen(message.state) == 0) {
+            ESP_LOGI(TAG, "State: %s", ptr);
+            strcpy(message.state, ptr);
+        } else if (strlen(message.mode) == 0) {
+            ESP_LOGI(TAG, "Mode: %s", ptr);
+            strcpy(message.mode, ptr);
+        }
+        
+        ptr = strtok(NULL, delimiter);
+    }
+    
+    httpd_resp_send_chunk(req, NULL, 0);
+
+    if (xQueueSend(xLedStateQueue, (void *) &message, 500 / portTICK_PERIOD_MS) == pdTRUE) {
+        printf("EVENT: WebServer -> Erfolgreich gesendet an die Queue\n");
+    } else {
+        printf("EVENT: WebServer -> Fehler beim senden an die Queue\n");
+    }
+
+    return ESP_OK;
+}
+
 httpd_handle_t startWebServer(const char *base_path) {
     static struct file_server_data *server_data = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.max_uri_handlers = 50;
+    config.max_uri_handlers = 51;
 
     app_desc = esp_ota_get_app_description();
 
@@ -409,6 +448,15 @@ httpd_handle_t startWebServer(const char *base_path) {
     printf("EVENT: WebServer -> Starting server on port: '%d'\n", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
+        printf("EVENT: WebServer -> Registering URI handlers\n");
+        httpd_uri_t ledSingleTest = {
+			.uri       = "/ledSingleTest",
+			.method    = HTTP_POST,
+			.handler   = ledSingleTestHandler,
+			.user_ctx  = server_data
+		};
+		httpd_register_uri_handler(server, &ledSingleTest);
+
         printf("EVENT: WebServer -> Registering URI handlers\n");
         httpd_uri_t serviceCss = {
 			.uri       = "/css/service.css",

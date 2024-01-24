@@ -25,7 +25,8 @@
 #define OFF                     "off"
 #define BLINK                   "blink"
 #define NORMAL                  "normal"
-#define test                    "test"
+#define TEST                    "test"
+#define SINGLETEST              "singleTest"
 
 #define BLINK_INTERVALL         1000
 #define BLINK_FREQ              200
@@ -42,14 +43,14 @@
 #define LEDC_FREQUENCY          (4000) // Frequency in Hertz. Set frequency at 4 kHz
 
 typedef struct ledState_t {
-   char led[10];
-   char state[10];
-   char mode[10];
+   char led[10];     // Which LED will be changed
+   char state[10];   // ON - OFF
+   char mode[10];    // TEST - NORMAL - BLINK(Only for the blue LED) - SINGLETEST
 } ledStateMessage;
 
 typedef struct ledProfil_t {
-   char state[10]; // ON - OFF
-   char mode[10]; // TEST - NORMAL - BLINK
+   char state[10];   // ON - OFF
+   char mode[10];    // TEST - NORMAL - BLINK(Only for the blue LED) - SINGLETEST
 } ledProfil;
 
 extern QueueHandle_t xLedStateQueue;
