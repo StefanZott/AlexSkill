@@ -350,7 +350,7 @@ static esp_err_t ledTestHandler(httpd_req_t *req) {
 
     ledStateMessage message;
 
-    strcpy(message.mode, "test");
+    message.mode = TEST;
     xQueueSend(xLedStateQueue, (void *) &message, 500 / portTICK_PERIOD_MS);
 
     httpd_resp_send_chunk(req, NULL, 0);
@@ -384,7 +384,7 @@ static esp_err_t ledSingleTestHandler(httpd_req_t *req) {
 
     ledStateMessage message = {'\0'};
     char buf[100] = {0x00};
-    int ret, remaining = req->content_len;
+    int count = 0;
     char delimiter[] = ",";
     char *ptr;
 
@@ -392,18 +392,15 @@ static esp_err_t ledSingleTestHandler(httpd_req_t *req) {
     ptr = strtok(buf, delimiter);
 
     while(ptr != NULL) {
-        ESP_LOGI(TAG, "Value: %s", ptr);
-        if (strlen(message.led) == 0) {
-            ESP_LOGI(TAG, "LED: %s", ptr);
-            strcpy(message.led, ptr);
-        } else if (strlen(message.state) == 0) {
-            ESP_LOGI(TAG, "State: %s", ptr);
-            strcpy(message.state, ptr);
-        } else if (strlen(message.mode) == 0) {
-            ESP_LOGI(TAG, "Mode: %s", ptr);
-            strcpy(message.mode, ptr);
+        if(count == 0) {
+            message.led = atoi(ptr);
+        } else if (count == 1) {
+            message.state = atoi(ptr);
+        } else if(count == 2) {
+            message.mode = atoi(ptr);
         }
         
+        count++;
         ptr = strtok(NULL, delimiter);
     }
     

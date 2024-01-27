@@ -8,8 +8,8 @@
     </div>
 
     <div class="input-group input-group mb-3 w-75">
-        <span class="input-group-text p-1 w-25" id="password">Password</span>
-        <input type="text" class="form-control" aria-label="Sizing example input" aria-describedby="password">
+        <span class="input-group-text p-1 w-25" id="passwordGroup">Password</span>
+        <input type="text" id="password" class="form-control" aria-label="Sizing example input" aria-describedby="passwordGroup">
     </div>
 
     <button type="button" id="connectWithSSID" class="btn btn-outline-danger">Verbinden</button>
@@ -23,11 +23,14 @@
         try {
             response = await fetch("/getSsidList");
             ssidList = await response.text()
+            console.log(ssidList);
             ssidList = ssidList.split(',');
             for (let index = 0; index < ssidList.length; index++) {
-                let option = document.createElement("option");
-                option.text = ssidList[index];
-                select.add(option, index);
+                if(ssidList[index].length > 0) {
+                    let option = document.createElement("option");
+                    option.text = ssidList[index];
+                    select.add(option, index);
+                }
             }
         } catch( err ) {
             document.getElementById("product_name").textContent = "---";
@@ -47,13 +50,10 @@
         }
     }
 
+    document.getElementById("connectWithSSID").addEventListener("click", function(e) {
+        e.preventDefault();
+        sendNewSSID();
+    });
 
-    window.addEventListener("load", function () {
-        document.getElementById("connectWithSSID").addEventListener("click", function(e) {
-            e.preventDefault();
-            sendNewSSID();
-        });
-
-        getSsidList();
-    })
+    getSsidList();
 </script>
