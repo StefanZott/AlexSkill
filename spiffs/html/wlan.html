@@ -1,19 +1,32 @@
-<div class="d-flex flex-column w-100 h-100 justify-content-center align-items-center">
+<div class="d-flex flex-column w-100 h-100">
 
-    <div class="input-group mb-3 w-75">
-        <label class="input-group-text p-1 w-25" for="selectSsid">SSID</label>
-        <select class="form-select" id="selectSsid">
-          <option selected>Auswählen...</option>
-        </select>
+    <div id="connection_info" class="d-flex border-bottom border-danger pb-2 m-2 align-items-center justify-content-center">
+        <label class="me-1" for="">Verbindungsstatus</label>
+        <input id="connection_info_input" class="p-1" type="text" placeholder="Verbindung getrennt" disabled>
     </div>
 
-    <div class="input-group input-group mb-3 w-75">
-        <span class="input-group-text p-1 w-25" id="passwordGroup">Password</span>
-        <input type="text" id="password" class="form-control" aria-label="Sizing example input" aria-describedby="passwordGroup">
+    <div id="ssid" class="d-flex align-items-center flex-column">
+        <div class="input-group mb-3 w-75">
+            <label class="input-group-text p-1 w-25" for="selectSsid">SSID</label>
+            <select class="form-select" id="selectSsid">
+              <option selected>Auswählen...</option>
+              <option value="1">One</option>
+              <option value="2">Two</option>
+              <option value="3">Three</option>
+            </select>
+        </div>
+    
+        <div class="input-group input-group mb-3 w-75">
+            <span class="input-group-text p-1 w-25" id="passwordGroup">Password</span>
+            <input type="text" id="password" class="form-control" aria-label="Sizing example input" aria-describedby="passwordGroup">
+        </div>
+
+        <button type="button" id="connectWithSSID" class="btn btn-outline-danger">Verbinden</button>
     </div>
 
-    <button type="button" id="connectWithSSID" class="btn btn-outline-danger">Verbinden</button>
+    <div id="wlan_info_container">
 
+    </div>
 </div>
 <script>
     async function getSsidList() {
@@ -23,14 +36,11 @@
         try {
             response = await fetch("/getSsidList");
             ssidList = await response.text()
-            console.log(ssidList);
             ssidList = ssidList.split(',');
             for (let index = 0; index < ssidList.length; index++) {
-                if(ssidList[index].length > 0) {
-                    let option = document.createElement("option");
-                    option.text = ssidList[index];
-                    select.add(option, index);
-                }
+                let option = document.createElement("option");
+                option.text = ssidList[index];
+                select.add(option, index);
             }
         } catch( err ) {
             document.getElementById("product_name").textContent = "---";
@@ -39,14 +49,40 @@
 
     async function sendNewSSID() {
         let data = document.getElementById("selectSsid").value + "," + document.getElementById("password").value
-        let ssid = document.querySelector("#selectSsid")
-        try {
-            const response = await fetch("/newSSID", {
-                method: "POST", // or 'PUT'
-                body: data,
-            });
-        } catch (error) {
-            console.error("Error:", error);
+        let ssid = document.querySelector("#selectSsid");
+
+        let resp = await fetch("/newSSID", {
+            method: "POST", // or 'PUT'
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: data,
+        });
+        resp = await resp.text();
+        resp = JSON.parse(resp)
+        console.log(resp)
+        if (resp !== "") {
+            document.getElementById("connection_info_input").placeholder = "Verbunden";
+            document.getElementById("ssid").classList.remove("d-flex");
+            document.getElementById("ssid").classList.add("d-none");
+
+            console.log("JSON len: ", Object.keys(resp).length);
+            for (let index = 0; index < Object.keys(resp).length; index++) {
+                let newDiv = document.createElement("div");
+                newDiv.classList.add("d-flex", "flex-row", "justify-content-around")
+
+                let newLabel = document.createElement("label");
+                newLabel.innerText = Object.keys(resp)[index];
+                newDiv.append(newLabel);
+
+                let newValue = document.createElement("span");
+                newValue.innerText = resp[Object.keys(resp)[index]];
+                newDiv.append(newValue);
+
+                document.getElementById("wlan_info_container").append(newDiv);
+            }
+        } else {
+
         }
     }
 
@@ -56,4 +92,9 @@
     });
 
     getSsidList();
+
+
+    window.addEventListener("load", function () {
+        
+    })
 </script>

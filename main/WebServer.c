@@ -10,6 +10,7 @@
 #include "WebServer.h"
 #include "WLAN.h"
 #include "LED.h"
+#include "cJSON.h"
 
 /* Max length a file path can have on storage */
 #define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_SPIFFS_OBJ_NAME_LEN)
@@ -415,6 +416,19 @@ static esp_err_t ledSingleTestHandler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t getInfosHandler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Load %s", req->uri);
+
+    cJSON* tempResponse = cJSON_CreateObject();
+    cJSON_AddStringToObject(tempResponse, "IDF-Version", app_desc->idf_ver);
+    cJSON_AddStringToObject(tempResponse, "Project-Version", app_desc->version);
+    
+    httpd_resp_set_type(req, HTTP_CONTENT_TYPE_JSON);
+    httpd_resp_send(req, cJSON_Print(tempResponse), strlen(cJSON_Print(tempResponse)));
+
+    return ESP_OK;
+}
+
 httpd_handle_t startWebServer(const char *base_path) {
     static struct file_server_data *server_data = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -445,6 +459,15 @@ httpd_handle_t startWebServer(const char *base_path) {
     printf("EVENT: WebServer -> Starting server on port: '%d'\n", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
+        printf("EVENT: WebServer -> Registering URI handlers\n");
+        httpd_uri_t getInfos = {
+			.uri       = "/getInfos",
+			.method    = HTTP_GET,
+			.handler   = getInfosHandler,
+			.user_ctx  = server_data
+		};
+		httpd_register_uri_handler(server, &getInfos);
+
         printf("EVENT: WebServer -> Registering URI handlers\n");
         httpd_uri_t ledSingleTest = {
 			.uri       = "/ledSingleTest",

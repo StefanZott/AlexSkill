@@ -1,1 +1,28 @@
-hello world
+<div id="info_container" class="d-flex flex-column w-100">
+
+</div>
+<script>
+    fetch("/getInfos", {
+        method: "GET",
+        headers: {
+            "Accept": "application/json"
+        }
+    }).then((response) => response.json())
+    .then(json => {
+        console.log("JSON len: ", Object.keys(json).length);
+        for (let index = 0; index < Object.keys(json).length; index++) {
+            let newDiv = document.createElement("div");
+            newDiv.classList.add("d-flex", "flex-row", "justify-content-around")
+
+            let newLabel = document.createElement("label");
+            newLabel.innerText = Object.keys(json)[index] + ":";
+            newDiv.append(newLabel);
+
+            let newValue = document.createElement("span");
+            newValue.innerText = json[Object.keys(json)[index]];
+            newDiv.append(newValue);
+
+            document.getElementById("info_container").append(newDiv);
+        }
+    })
+</script>
