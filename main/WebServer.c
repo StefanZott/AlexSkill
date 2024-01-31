@@ -429,6 +429,23 @@ static esp_err_t getInfosHandler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t disconnectWIFIHandler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Load %s", req->uri);
+
+    wifiConfigMessage message;
+
+    message.state = START_AP;
+
+    if (xQueueSend(xWifiConfigQueue, (void *) &message, 500 / portTICK_PERIOD_MS) == pdTRUE) {
+        printf("EVENT: WebServer -> Erfolgreich gesendet an die Queue\n");
+    } else {
+        printf("EVENT: WebServer -> Fehler beim senden an die Queue\n");
+    }
+    httpd_resp_send(req, "disconnected", strlen(disconnected));
+
+    return ESP_OK;
+}
+
 httpd_handle_t startWebServer(const char *base_path) {
     static struct file_server_data *server_data = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -460,6 +477,14 @@ httpd_handle_t startWebServer(const char *base_path) {
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
         printf("EVENT: WebServer -> Registering URI handlers\n");
+        httpd_uri_t disconnectWIFI = {
+			.uri       = "/disconnectWIFIHandler",
+			.method    = HTTP_GET,
+			.handler   = disconnectWIFIHandler,
+			.user_ctx  = server_data
+		};
+		httpd_register_uri_handler(server, &disconnectWIFI);
+
         httpd_uri_t getInfos = {
 			.uri       = "/getInfos",
 			.method    = HTTP_GET,

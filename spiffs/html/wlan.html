@@ -10,9 +10,6 @@
             <label class="input-group-text p-1 w-25" for="selectSsid">SSID</label>
             <select class="form-select" id="selectSsid">
               <option selected>Auswählen...</option>
-              <option value="1">One</option>
-              <option value="2">Two</option>
-              <option value="3">Three</option>
             </select>
         </div>
     
@@ -24,7 +21,7 @@
         <button type="button" id="connectWithSSID" class="btn btn-outline-danger">Verbinden</button>
     </div>
 
-    <div id="wlan_info_container">
+    <div id="wlan_info_container" class="d-flex flex-column flex-fill px-2">
 
     </div>
 </div>
@@ -69,20 +66,60 @@
             console.log("JSON len: ", Object.keys(resp).length);
             for (let index = 0; index < Object.keys(resp).length; index++) {
                 let newDiv = document.createElement("div");
-                newDiv.classList.add("d-flex", "flex-row", "justify-content-around")
+                newDiv.style.height = "6%";
+                newDiv.classList.add("d-flex", "flex-row", "justify-content-around", "border", "border-danger", "mt-2")
+
+                let divLabel = document.createElement("div");
+                divLabel.classList.add("d-flex", "w-50", "align-items-center", "justify-content-center", "bg-secondary");
 
                 let newLabel = document.createElement("label");
                 newLabel.innerText = Object.keys(resp)[index];
-                newDiv.append(newLabel);
+                divLabel.append(newLabel);
+                newDiv.append(divLabel);
+
+                let divValue = document.createElement("div");
+                divValue.classList.add("d-flex", "w-50", "align-items-center", "justify-content-center", "bg-light")
 
                 let newValue = document.createElement("span");
                 newValue.innerText = resp[Object.keys(resp)[index]];
-                newDiv.append(newValue);
+                divValue.append(newValue);
+                newDiv.append(divValue);
 
                 document.getElementById("wlan_info_container").append(newDiv);
             }
+
+            let disconnectSsidBtn = document.createElement("button");
+            disconnectSsidBtn.id = "disconnectSsidBtn";
+            disconnectSsidBtn.innerText = "Verbindung trennen";
+            disconnectSsidBtn.classList.add("w-100", "border", "border-danger", "mt-2");
+            disconnectSsidBtn.style.height = "6%";
+            document.getElementById("wlan_info_container").append(disconnectSsidBtn);
         } else {
 
+        }
+    }
+
+    async function disconnectWithWIFI() {
+        let resp = await fetch("/disconnectWIFI", {
+            method: "GET", // or 'PUT'
+            headers: {
+                "Content-Type": "text/plain"
+            }
+        });
+        resp = await resp.text();
+
+        if(resp === "disconnected") {
+            document.getElementById("connection_info_input").placeholder = "Verbindung getrennt";
+
+            document.getElementById("wlan_info_container").classList.remove("d-flex");
+            document.getElementById("wlan_info_container").classList.add("d-none");
+
+            document.getElementById("ssid").classList.remove("d-none");
+            document.getElementById("ssid").classList.add("d-flex");
+
+            // TODO: Wenn die Trennug der Vebindung erfolgreich war, dann soll ein grüner Container mit entsprechenden Text angezeigt werden
+        } else {
+            // TODO: Wenn die Trennug der Vebindung nicht erfolgreich war, dann soll ein roter Container mit entsprechenden Text angezeigt werden.
         }
     }
 
@@ -91,10 +128,10 @@
         sendNewSSID();
     });
 
+    document.getElementById("disconnectSsidBtn").addEventListener("click", function(e) {
+        e.preventDefault();
+        disconnectWithWIFI();
+    });
+
     getSsidList();
-
-
-    window.addEventListener("load", function () {
-        
-    })
 </script>
