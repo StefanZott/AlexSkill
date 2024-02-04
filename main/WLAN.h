@@ -10,8 +10,9 @@
 
 #include "main.h"
 #include "esp_netif.h"
+#include "esp_wifi.h"
 
-#define SCAN_LIST_SIZE     10
+#define SCAN_LIST_SIZE              10
 #define AP_ESP_WIFI_PASS            "telegaertner"
 #define AP_ESP_WIFI_CHANNEL         1
 #define AP_MAX_STA_CONN             2     // Ganz bewusste Beschränkung, damit nicht mehrere gleichzeitig auf Konfigurationsseite zugreifen
@@ -40,10 +41,13 @@ typedef struct wifiConfigMessage_t {
 
 extern WIFI_STATE_TYPE wifiState;
 extern QueueHandle_t xWifiConfigQueue;
-extern char ssidList[SCAN_LIST_SIZE][MAX_CRED_LEN]; 
+extern SemaphoreHandle_t xWifiStateMutex;
+extern char ssidList[SCAN_LIST_SIZE][MAX_CRED_LEN];
+extern const char *wifiConfigFile;
 
 void wifiControlTask( void *pvParameters );
 void wifi_init_sta_and_softap(void);
 int getWifiState();
+char* getSSID();
 
 #endif /* MAIN_WIFI_H_ */

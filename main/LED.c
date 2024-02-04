@@ -141,7 +141,7 @@ static void saveSettings() {
     // ESP_LOGI(TAG, "Save Settings tempMessage -> LED = %s, State = %s, Mode = %s", tempMessage.led, tempMessage.state, tempMessage.mode);
     // ESP_LOGI(TAG, "Save Settings message -> LED = %s, State = %s, Mode = %s", message.led, message.state, message.mode);
     if (tempMessage.mode != TEST && tempMessage.mode != SINGLETEST) {
-        ESP_LOGI(TAG, "Save Settings message and LEDs");
+        // ESP_LOGI(TAG, "Save Settings message and LEDs");
 
         message.led = tempMessage.led;
         message.state = tempMessage.state;

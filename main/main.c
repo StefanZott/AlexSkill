@@ -12,12 +12,14 @@
 #include "LED.h"
 #include "WLAN.h"
 #include "WebServer.h"
+#include "FileManagment.h"
 
 SemaphoreHandle_t xLedMutex;
 SemaphoreHandle_t xLedSemaphore;
 
 const char *productName = "DoorLine Skill";
 const char *FW_Version = "V0.0.1";
+cJSON* config;
 
 static int ret;
 
@@ -60,8 +62,7 @@ static esp_err_t initSpiffs(void) {
 void app_main(void) {
     //Initialize NVS
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_flash_erase());
         ret = nvs_flash_init();
     }
@@ -79,6 +80,36 @@ void app_main(void) {
     xTaskCreatePinnedToCore( ledControlTask, "ledControlTask", 4096, NULL, 1, NULL, PRO_CPU );
     xTaskCreatePinnedToCore( executeTaskCotrol, "TaskControl", 2048, NULL, 1, NULL, PRO_CPU );
     xTaskCreatePinnedToCore( wifiControlTask, "wifiControlTask", 8192, NULL, 1, NULL, APP_CPU );
+
+    if(file_isExisting(wifiConfigFile)) {
+        if(cJSON_IsNull(config)) {
+            config = cJSON_Parse(file_getContent(wifiConfigFile));
+        } else {
+            config = cJSON_CreateObject();
+            cJSON_AddStringToObject(config, "SSID", "");
+            cJSON_AddStringToObject(config, "Password", "");
+            cJSON_AddStringToObject(config, "Channel", "");
+            cJSON_AddStringToObject(config, "RSSI", "");
+            cJSON_AddStringToObject(config, "Authenticate Mode", "");
+
+            cJSON_AddStringToObject(config, "IP", "");
+            cJSON_AddStringToObject(config, "Netmask", "");
+            cJSON_AddStringToObject(config, "Gateway", "");
+            file_writeContentInFile(wifiConfigFile, config);
+        }
+    } else {
+        config = cJSON_CreateObject();
+        cJSON_AddStringToObject(config, "SSID", "");
+        cJSON_AddStringToObject(config, "Password", "");
+        cJSON_AddStringToObject(config, "Channel", "");
+        cJSON_AddStringToObject(config, "RSSI", "");
+        cJSON_AddNumberToObject(config, "Authenticate Mode", -1);
+
+        cJSON_AddStringToObject(config, "IP", "");
+        cJSON_AddStringToObject(config, "Netmask", "");
+        cJSON_AddStringToObject(config, "Gateway", "");
+        file_writeContentInFile(wifiConfigFile, config);
+    }
 
     wifi_init_sta_and_softap();
 }

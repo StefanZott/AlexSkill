@@ -9,6 +9,7 @@
 #define MAIN_H_
 
 #include "driver/gpio.h"
+#include "cJSON.h"
 
 #define MAX_CRED_LEN       32       // WLAN ssid und password max. 31 Zeichen + Stringendezeichen
 
@@ -24,5 +25,6 @@ typedef enum ledModi {
 extern SemaphoreHandle_t xLedMutex;
 extern SemaphoreHandle_t xLedSemaphore;
 extern const char *FW_Version, *productName;
+extern cJSON* config;
 
 #endif /* MAIN_H_ */

@@ -5,6 +5,9 @@
 #include <esp_app_desc.h>
 #include "esp_ota_ops.h"
 #include <esp_log.h>
+#include "esp_wifi.h"
+#include "lwip/inet.h"
+#include "esp_netif.h"
 
 #include "main.h"
 #include "WebServer.h"
@@ -37,6 +40,7 @@ static esp_app_desc_t *app_desc;
 static char responseStr[500];
 static httpd_handle_t server = NULL;
 static const char* TAG = "Webserver";
+static cJSON* tempObject;
 
 const char *getPathFromUri(char *dest, const char *base_path, const char *uri, size_t destsize) {
 
@@ -420,11 +424,16 @@ static esp_err_t getInfosHandler(httpd_req_t *req) {
     ESP_LOGI(TAG, "Load %s", req->uri);
 
     cJSON* tempResponse = cJSON_CreateObject();
+    cJSON_AddStringToObject(tempResponse, "Projekt-Name", app_desc->project_name);
+    cJSON_AddStringToObject(tempResponse, "Projekt-Version", app_desc->version);
     cJSON_AddStringToObject(tempResponse, "IDF-Version", app_desc->idf_ver);
-    cJSON_AddStringToObject(tempResponse, "Project-Version", app_desc->version);
+    cJSON_AddStringToObject(tempResponse, "Kompilierzeit", app_desc->time);
+    cJSON_AddStringToObject(tempResponse, "Kompilierdatum", app_desc->date);
     
     httpd_resp_set_type(req, HTTP_CONTENT_TYPE_JSON);
     httpd_resp_send(req, cJSON_Print(tempResponse), strlen(cJSON_Print(tempResponse)));
+
+    cJSON_Delete(tempResponse);
 
     return ESP_OK;
 }
@@ -441,7 +450,62 @@ static esp_err_t disconnectWIFIHandler(httpd_req_t *req) {
     } else {
         printf("EVENT: WebServer -> Fehler beim senden an die Queue\n");
     }
-    httpd_resp_send(req, "disconnected", strlen(disconnected));
+    
+    httpd_resp_send(req, "disconnected", strlen("disconnected"));
+
+    return ESP_OK;
+}
+
+static esp_err_t getWifiStateHandler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Load %s", req->uri);
+
+    itoa(getWifiState(), responseStr, 10);
+    
+    httpd_resp_send(req,  responseStr, strlen(responseStr));
+
+    return ESP_OK;
+}
+
+static esp_err_t getConnectionInfoHandler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Load %s", req->uri);
+    tempObject = cJSON_CreateObject();
+
+    for (size_t i = 0; i < SCAN_LIST_SIZE; i++) {
+        if (strlen(cJSON_GetObjectItem(config, "SSID")->valuestring) == 0) {
+            ESP_LOGI(TAG, "Keine SSID vorhanden!");
+            cJSON_AddStringToObject(tempObject, "SSID", "Unbekannt");
+            cJSON_AddStringToObject(tempObject, "Channel", "Unbekannt");
+            cJSON_AddStringToObject(tempObject, "RSSI", "Unbekannt");
+            cJSON_AddStringToObject(tempObject, "Authenticate Mode", "Unbekannt");
+        } else {
+            cJSON_AddStringToObject(tempObject, "SSID", cJSON_GetObjectItem(config, "SSID")->valuestring);
+
+            if (strlen(cJSON_GetObjectItem(config, "Channel")->valuestring) == 0) {
+                cJSON_AddStringToObject(tempObject, "Channel", "Unbekannt");
+            } else {
+                cJSON_AddStringToObject(tempObject, "Channel", cJSON_GetObjectItem(config, "Channel")->valuestring);
+            }
+
+            if (strlen(cJSON_GetObjectItem(config, "RSSI")->valuestring) == 0) {
+                cJSON_AddStringToObject(tempObject, "RSSI", "Unbekannt");
+            } else {
+                cJSON_AddStringToObject(tempObject, "RSSI", cJSON_GetObjectItem(config, "RSSI")->valuestring);
+            }
+
+            // Information about coonection
+            cJSON_AddStringToObject(tempObject, "IP", cJSON_GetObjectItem(config, "IP")->valuestring);
+            cJSON_AddStringToObject(tempObject, "Netmask", cJSON_GetObjectItem(config, "Netmask")->valuestring);
+            cJSON_AddStringToObject(tempObject, "Gateway", cJSON_GetObjectItem(config, "Gateway")->valuestring);
+
+            // TODO: MAC-Adresse wäre noch schön
+            break;
+        }
+    }
+    
+    httpd_resp_set_type(req, HTTP_CONTENT_TYPE_JSON);
+    httpd_resp_send(req, cJSON_Print(tempObject), strlen(cJSON_Print(tempObject)));
+
+    cJSON_Delete(tempObject);
 
     return ESP_OK;
 }
@@ -476,6 +540,23 @@ httpd_handle_t startWebServer(const char *base_path) {
     printf("EVENT: WebServer -> Starting server on port: '%d'\n", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
+        printf("EVENT: WebServer -> Registering URI handlers\n");
+        httpd_uri_t getConnectionInfo = {
+			.uri       = "/getConnectionInfo",
+			.method    = HTTP_GET,
+			.handler   = getConnectionInfoHandler,
+			.user_ctx  = server_data
+		};
+		httpd_register_uri_handler(server, &getConnectionInfo);
+
+        httpd_uri_t getWifiState = {
+			.uri       = "/getWifiState",
+			.method    = HTTP_GET,
+			.handler   = getWifiStateHandler,
+			.user_ctx  = server_data
+		};
+		httpd_register_uri_handler(server, &getWifiState);
+
         printf("EVENT: WebServer -> Registering URI handlers\n");
         httpd_uri_t disconnectWIFI = {
 			.uri       = "/disconnectWIFIHandler",

@@ -11,7 +11,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
-#include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -131,14 +130,14 @@ const unsigned char aesInitVector[] = { 0x1e, 0x2c, 0x82, 0xd0, 0x22, 0x4c, 0x2e
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
 static wifi_scan_config_t wifiScanConfig;
-
 WIFI_STATE_TYPE wifiState;
 char macString[18];
 QueueHandle_t xWifiConfigQueue;
+SemaphoreHandle_t xWifiStateMutex;
+SemaphoreHandle_t xSsidMutex;
 char ssidList[SCAN_LIST_SIZE][MAX_CRED_LEN]; 
-const char *wifiConfigFile = "/spiffs/config/configuration.json";
+const char *wifiConfigFile = "/spiffs/configuration.json";
 char buffer[3000];
-cJSON* config;
 cJSON* tempObject;
 
 static void scan() {
@@ -210,8 +209,23 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
             ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_start( &wifiScanConfig, false ));
          }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG,"Got IP:" IPSTR "", IP2STR(&event->ip_info.ip));
+        ip_event_got_ip_t *networkInfo = (ip_event_got_ip_t *) event_data;
+        char temp[20] = {'\0'};
+
+        sprintf(temp, IPSTR, IP2STR(&networkInfo->ip_info.ip));
+        cJSON_SetValuestring(cJSON_GetObjectItem(config, "IP"), temp);
+        memset(&temp, 0x00, sizeof(temp));
+
+        sprintf(temp, IPSTR, IP2STR(&networkInfo->ip_info.netmask));
+        cJSON_SetValuestring(cJSON_GetObjectItem(config, "Netmask"), temp);
+        memset(&temp, 0x00, sizeof(temp));
+
+        sprintf(temp, IPSTR, IP2STR(&networkInfo->ip_info.gw));
+        cJSON_SetValuestring(cJSON_GetObjectItem(config, "Gateway"), temp);
+        memset(&temp, 0x00, sizeof(temp));
+
+        ESP_LOGI(TAG,"Got IP: %s", cJSON_GetObjectItem(config, "IP")->valuestring);
+        file_writeContentInFile(wifiConfigFile, config);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     } else if( event_id == WIFI_EVENT_SCAN_DONE ) {
@@ -220,36 +234,28 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         message.state = START_AP;
         xQueueSend(xWifiConfigQueue, (void*) &message, 100 / portTICK_PERIOD_MS);
     } else if( event_id == WIFI_EVENT_STA_CONNECTED ) {
+        wifi_ap_record_t ap_info = {'\0'};
         wifiState = STATION_CONNECTED;
-        if( writeToConfigFileFlag == true )          // In diesem Fall keine Semaphore notwendig
-         {
+        if( writeToConfigFileFlag == true ) {          // In diesem Fall keine Semaphore notwendig
             writeToConfigFileFlag = false;
-            if(( file = fopen( wifiConfigFile, "w" )) != NULL )                // Zugangsdaten in Datei speichern
-            {
-               len = sprintf( (char *)aesBuf, "%s\n%s\n", wifi_sta_config.sta.ssid, wifi_sta_config.sta.password );    // len ohne '\0' Abschlusszeichen
-               padding = AES_BLOCKLEN - ( len & ( AES_BLOCKLEN - 1 ));        // len & 0x0f entspricht % 16
-               memset( &aesBuf[len], padding, padding );                      // PKCS7 padding
-               len += padding;                                                // Aufrundung auf Vielfaches der Blockgröße
-               memcpy( iv, aesInitVector, AES_BLOCKLEN );
-               esp_aes_crypt_cbc( &aesContext, ESP_AES_ENCRYPT, len, iv, aesBuf, aesBuf );
-               if( fwrite( aesBuf, 1, len, file ) != len )
-                  ESP_LOGE(TAG, "%s", errFileWrite);
-               if( fclose( file ) == EOF )
-                  ESP_LOGE(TAG, "%s", failCloseFile);
-            }
-            else
-               ESP_LOGE(TAG, "%s", failOpenFileForWrite);
-         }
+            cJSON_SetValuestring(cJSON_GetObjectItem(config, "SSID"), (char*) wifi_sta_config.sta.ssid);
+            cJSON_SetValuestring(cJSON_GetObjectItem(config, "Password"), (char*) wifi_sta_config.sta.password);
 
-         ledMessage.mode = NORMAL;
-         ledMessage.led = LED_BLUE;
-         ledMessage.state = ON;
-         xQueueSend(xLedStateQueue, (void *) &ledMessage, 500 / portTICK_PERIOD_MS);
+            esp_wifi_sta_get_ap_info(&ap_info);
+            // cJSON_SetValuestring(cJSON_GetObjectItem(config, "Channel"), (char*)ap_info.primary);
+            // cJSON_SetNumberValue(cJSON_GetObjectItem(config, "Authenticate Mode"), ap_info.authmode);
+
+            file_writeContentInFile(wifiConfigFile, config);
+        }
+
+        ledMessage.mode = NORMAL;
+        ledMessage.led = LED_BLUE;
+        ledMessage.state = ON;
+        xQueueSend(xLedStateQueue, (void *) &ledMessage, 500 / portTICK_PERIOD_MS);
     }
 }
 
-static void copyWifiCredentials( wifiConfigMessage *message )
-{
+static void copyWifiCredentials( wifiConfigMessage *message ) {
    strcpy( (char *)wifi_sta_config.sta.ssid, message->ssid );
    // puts( message->ssid );
    strcpy( (char *)wifi_sta_config.sta.password, message->password );
@@ -295,27 +301,37 @@ void wifi_init_sta_and_softap(void) {
     }
     wifiScanConfig.scan_time = wifiScanTime;              // Die restlichen Elemente der Struktur sind NULL bzw. 0
 
-    if(( file = fopen( wifiConfigFile, "r" )) == NULL ) {
+    if (strlen(cJSON_GetObjectItem(config, "SSID")->valuestring) == 0) {
         wifiState = STATION_SCANNING;
     } else {
         wifiState = STATION_CONNECTING;
-        stat( wifiConfigFile, &entry_stat );
-        len = entry_stat.st_size;
-        res = fread( aesBuf, 1, len, file );
-        if( res != len || len % 16 )
-            ESP_LOGE(TAG, "%s", errFileRead);
-        else
-        {
-            memcpy( iv, aesInitVector, AES_BLOCKLEN );
-            esp_aes_crypt_cbc( &aesContext, ESP_AES_DECRYPT, len, iv, aesBuf, aesBuf );
-            aesBuf[len] = '\0';
-            res = readLineFromConfigFile( (char *) aesBuf, (char *)wifi_sta_config.sta.ssid );
-            if( res != -1 )
-                readLineFromConfigFile( (char *) &aesBuf[res + 1], (char *)wifi_sta_config.sta.password );
-        }
-        if( fclose( file ) == EOF )
-            ESP_LOGE(TAG, "%s", failCloseFile);
+
+        strcpy((char *)wifi_sta_config.sta.ssid, cJSON_GetObjectItem(config, "SSID")->valuestring);
+        strcpy((char *)wifi_sta_config.sta.password, cJSON_GetObjectItem(config, "SSID_PW")->valuestring);
     }
+    
+
+    // if(( file = fopen( wifiConfigFile, "r" )) == NULL ) {
+    //     wifiState = STATION_SCANNING;
+    // } else {
+    //     wifiState = STATION_CONNECTING;
+    //     stat( wifiConfigFile, &entry_stat );
+    //     len = entry_stat.st_size;
+    //     res = fread( aesBuf, 1, len, file );
+    //     if( res != len || len % 16 )
+    //         ESP_LOGE(TAG, "%s", errFileRead);
+    //     else
+    //     {
+    //         memcpy( iv, aesInitVector, AES_BLOCKLEN );
+    //         esp_aes_crypt_cbc( &aesContext, ESP_AES_DECRYPT, len, iv, aesBuf, aesBuf );
+    //         aesBuf[len] = '\0';
+    //         res = readLineFromConfigFile( (char *) aesBuf, (char *)wifi_sta_config.sta.ssid );
+    //         if( res != -1 )
+    //             readLineFromConfigFile( (char *) &aesBuf[res + 1], (char *)wifi_sta_config.sta.password );
+    //     }
+    //     if( fclose( file ) == EOF )
+    //         ESP_LOGE(TAG, "%s", failCloseFile);
+    // }
 
     ESP_LOGI(TAG,"SSID = %s, PW = %s.", (char*)wifi_sta_config.sta.ssid, (char*)wifi_sta_config.sta.password);
 
@@ -354,7 +370,8 @@ void wifi_init_sta_and_softap(void) {
 void wifiControlTask( void *pvParameters ) {
     wifiConfigMessage message;
     xWifiConfigQueue = xQueueCreate( 10, sizeof( wifiConfigMessage ) );
-    config = cJSON_CreateObject();
+    xWifiStateMutex = xSemaphoreCreateMutex();
+    xSsidMutex = xSemaphoreCreateMutex();
 
     while( 1 ) {
         if( xQueueReceive( xWifiConfigQueue, (void *) &message, portMAX_DELAY ) == pdTRUE ){
@@ -364,6 +381,7 @@ void wifiControlTask( void *pvParameters ) {
 
                 if( wifiState == ACCESS_POINT ) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_stop());                // stop soft-AP
+                    ESP_LOGI(TAG, "SSID = %s, Passwort = %s", message.ssid, message.password);
 
                     wifiState = STATION_CONNECTING;        // Ganz wichtig jetzt Zuweisung hier, da Abfrage beim WIFI_EVENT_STA_START
                     copyWifiCredentials( &message );
@@ -392,5 +410,23 @@ void wifiControlTask( void *pvParameters ) {
 }
 
 int getWifiState() {
-    return wifiState;
+    WIFI_STATE_TYPE tempWifiState = ACCESS_POINT;
+
+    if (xSemaphoreTake(xWifiStateMutex, ( TickType_t ) 0 ) == pdTRUE) {
+        tempWifiState = wifiState;
+
+        xSemaphoreGive(xWifiStateMutex);
+    }
+    
+
+    return tempWifiState;
+}
+
+char* getSSID() {
+    if (xSemaphoreTake(xSsidMutex, ( TickType_t ) 0 ) == pdTRUE) {
+        ESP_LOGI(TAG, "getSSID -> Send SSID: %s", (char *)wifi_sta_config.sta.ssid);
+        xSemaphoreGive(xSsidMutex);
+    }
+
+    return (char *)wifi_sta_config.sta.ssid;
 }

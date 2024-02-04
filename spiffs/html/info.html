@@ -11,18 +11,27 @@
     .then(json => {
         console.log("JSON len: ", Object.keys(json).length);
         for (let index = 0; index < Object.keys(json).length; index++) {
-            let newDiv = document.createElement("div");
-            newDiv.classList.add("d-flex", "flex-row", "justify-content-around")
+                let newDiv = document.createElement("div");
+                newDiv.style.height = "6%";
+                newDiv.classList.add("d-flex", "flex-row", "justify-content-around", "border", "border-danger", "mt-2")
 
-            let newLabel = document.createElement("label");
-            newLabel.innerText = Object.keys(json)[index] + ":";
-            newDiv.append(newLabel);
+                let divLabel = document.createElement("div");
+                divLabel.classList.add("d-flex", "w-50", "align-items-center", "justify-content-center", "bg-secondary");
 
-            let newValue = document.createElement("span");
-            newValue.innerText = json[Object.keys(json)[index]];
-            newDiv.append(newValue);
+                let newLabel = document.createElement("label");
+                newLabel.innerText = Object.keys(json)[index];
+                divLabel.append(newLabel);
+                newDiv.append(divLabel);
 
-            document.getElementById("info_container").append(newDiv);
-        }
+                let divValue = document.createElement("div");
+                divValue.classList.add("d-flex", "w-50", "align-items-center", "justify-content-center", "bg-light")
+
+                let newValue = document.createElement("span");
+                newValue.innerText = json[Object.keys(json)[index]];
+                divValue.append(newValue);
+                newDiv.append(divValue);
+
+                document.getElementById("info_container").append(newDiv);
+            }
     })
 </script>
